@@ -1,7 +1,5 @@
 # Drone Crowd Intelligence System
 
-## Dev/Creator: tubakhxn
-
 This is a locally runnable computer vision research dashboard that simulates
 drone based crowd monitoring. It combines a live video dashboard, crowd
 density analytics, a bird's eye density view, a 3D crowd reconstruction
