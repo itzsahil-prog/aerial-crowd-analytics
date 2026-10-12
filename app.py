@@ -1,7 +1,5 @@
-# dev/creator: tubakhxn
-
-import time
 import tempfile
+import time
 from collections import deque
 
 import cv2
