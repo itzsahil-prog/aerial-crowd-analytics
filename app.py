@@ -1,3 +1,4 @@
+import os
 import tempfile
 import time
 from collections import deque
@@ -219,7 +220,6 @@ mode_tag = {
     "synthetic": "LIVE (SIMULATION)",
 }.get(active_mode, "LIVE")
 status_html = f'<span class="status-live">● {mode_tag}</span>' if ss.running else '<span class="status-sim">■ PAUSED</span>'
-alerts_count = sum(1 for _ in list(ss.alert_log)[:10])
 st.markdown(f"""
 <div class="hud-bar">
   <div class="hud-title">🚁 DRONE CROWD INTELLIGENCE</div>
@@ -375,7 +375,7 @@ if ss.last_generated_video:
         video_bytes = f.read()
     st.video(video_bytes)
     st.download_button("⬇ Download MP4", data=video_bytes,
-                        file_name=ss.last_generated_video.split("/")[-1], mime="video/mp4")
+                        file_name=os.path.basename(ss.last_generated_video), mime="video/mp4")
 
 if ss.running:
     time.sleep(max(0.02, 0.12 / playback_speed))

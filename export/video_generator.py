@@ -1,6 +1,7 @@
 # dev/creator: tubakhxn
 
 import os
+import tempfile
 import time
 
 import cv2
@@ -16,6 +17,18 @@ from vision.video_processor import (
     make_blank_aerial_canvas, draw_detections, apply_heatmap_overlay, draw_hud,
     composite_bird_eye_inset, draw_glow_markers,
 )
+
+def _get_output_dir():
+    """Return a writable output directory (falls back to system temp on read-only filesystems)."""
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        test_path = os.path.join(OUTPUT_DIR, ".write_test")
+        with open(test_path, "w") as f:
+            f.write("ok")
+        os.remove(test_path)
+        return OUTPUT_DIR
+    except OSError:
+        return tempfile.gettempdir()
 
 def _title_card(w, h, text_lines, duration_frames=15):
     frames = []
@@ -50,8 +63,9 @@ def generate_demo_video(
     w, h = resolution
     total_frames = int(duration_seconds * fps)
 
+    out_dir = _get_output_dir()
     filename = f"drone_crowd_demo_{int(time.time())}.mp4"
-    out_path = os.path.join(OUTPUT_DIR, filename)
+    out_path = os.path.join(out_dir, filename)
     writer = _open_writer(out_path, fps, w, h)
     if writer is None:
         raise RuntimeError(
