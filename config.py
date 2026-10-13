@@ -1,4 +1,4 @@
-# dev/creator: tubakhxn
+# dev/creator: sahil
 
 DEFAULT_FRAME_WIDTH = 960
 DEFAULT_FRAME_HEIGHT = 540
