@@ -227,11 +227,14 @@ with st.sidebar:
             max_disappeared=config.TRACKER_MAX_DISAPPEARED,
             max_distance=config.TRACKER_MAX_DISTANCE,
         )
+        if ss.video_capture is not None:
+            ss.video_capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
         ss.frame_idx = 0
         ss.count_history.clear()
         ss.density_history.clear()
         ss.conf_history.clear()
         ss.alert_log.clear()
+        ss.last_generated_video = None
         ss.running = False
     playback_speed = st.slider("Speed multiplier", 0.25, 3.0, 1.0, 0.25)
 
@@ -251,9 +254,15 @@ with st.sidebar:
         if uploaded is not None and ss.video_source_name != uploaded.name:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
             tfile.write(uploaded.read())
+            tfile.flush()
+            tfile.close()  # must close on Windows before cv2 can open it
+            if ss.video_capture is not None:
+                ss.video_capture.release()
             ss.video_capture = cv2.VideoCapture(tfile.name)
             ss.video_source_name = uploaded.name
     else:
+        if ss.video_capture is not None:
+            ss.video_capture.release()
         ss.video_capture = None
         ss.video_source_name = "Synthetic Scene"
 
@@ -596,7 +605,7 @@ if generate_clicked:
         f"mode: {export_result['mode']}  ·  source: {ss.video_source_name}"
     )
 
-if ss.last_generated_video:
+if ss.last_generated_video and os.path.exists(ss.last_generated_video):
     st.markdown('<div class="panel-title">Exported Video</div>', unsafe_allow_html=True)
     with open(ss.last_generated_video, "rb") as f:
         video_bytes = f.read()
