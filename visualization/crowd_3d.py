@@ -55,45 +55,46 @@ def build_3d_density_figure(
             ),
         ))
     else:
-        if not points_xy:
-            # Render a single invisible anchor point so panel stays dark
-            fig.add_trace(go.Scatter3d(
-                x=[frame_w / 2], y=[frame_h / 2], z=[0],
-                mode="markers",
-                marker=dict(size=0.1, opacity=0),
-            ))
-        else:
-            cw, ch = frame_w / gx, frame_h / gy
-            xs_p, ys_p, zs_p, colors = [], [], [], []
-            for x, y in points_xy:
-                cx = min(int(x // cw), gx - 1)
-                cy = min(int(y // ch), gy - 1)
-                z = float(counts[cy, cx])
-                xs_p.append(x)
-                ys_p.append(y)
-                zs_p.append(z)
-                colors.append(z)
-            max_c = max(colors) if colors else 1.0
-            min_c = min(colors) if colors else 0.0
-            # avoid cmin==cmax (all same density) which makes Plotly go white
-            if max_c == min_c:
-                max_c = min_c + 1.0
-            fig.add_trace(go.Scatter3d(
-                x=xs_p, y=ys_p, z=zs_p, mode="markers",
-                marker=dict(
-                    size=3,
-                    color=colors,
-                    cmin=min_c,
-                    cmax=max_c,
-                    colorscale=[
-                        [0.0, THEME["cyan"]],
-                        [0.6, THEME["orange"]],
-                        [1.0, THEME["red"]],
-                    ],
-                    opacity=0.85,
-                    showscale=False,
-                ),
-            ))
+        # Points mode
+        cw, ch = frame_w / gx, frame_h / gy
+        xs_p, ys_p, zs_p, colors = [], [], [], []
+        
+        for x, y in points_xy:
+            cx = min(int(x // cw), gx - 1)
+            cy = min(int(y // ch), gy - 1)
+            z = float(counts[cy, cx])
+            xs_p.append(x)
+            ys_p.append(y)
+            zs_p.append(z)
+            colors.append(z)
+        
+        if not xs_p:
+            # No data yet — render a single invisible anchor point so panel stays dark
+            xs_p, ys_p, zs_p = [frame_w / 2], [frame_h / 2], [0]
+            colors = [0]
+        
+        max_c = max(colors) if colors else 1.0
+        min_c = min(colors) if colors else 0.0
+        # avoid cmin==cmax (all same density) which makes Plotly go white
+        if max_c == min_c:
+            max_c = min_c + 1.0
+        
+        fig.add_trace(go.Scatter3d(
+            x=xs_p, y=ys_p, z=zs_p, mode="markers",
+            marker=dict(
+                size=3 if len(xs_p) > 1 else 0.1,
+                color=colors,
+                cmin=min_c,
+                cmax=max_c,
+                colorscale=[
+                    [0.0, THEME["cyan"]],
+                    [0.6, THEME["orange"]],
+                    [1.0, THEME["red"]],
+                ],
+                opacity=0.85 if len(xs_p) > 1 else 0,
+                showscale=False,
+            ),
+        ))
 
     fig.update_layout(
         paper_bgcolor=THEME["panel_bg"],
