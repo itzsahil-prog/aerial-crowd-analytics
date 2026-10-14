@@ -184,6 +184,7 @@ def init_state():
     ss.setdefault("last_bev_points_key", None)
     ss.setdefault("last_3d_fig", None)
     ss.setdefault("last_3d_points_key", None)
+    ss.setdefault("_detection_ready", True)
 
 
 init_state()
@@ -355,28 +356,82 @@ def read_source_frame():
     return make_blank_aerial_canvas(W, H)
 
 
+import threading as _threading
+
 if ss.running:
     ss.frame_idx += 1
 
 frame = read_source_frame()
 use_real_detection = enable_detections and ss.video_capture is not None
 
-# Only re-run detection when frame index or confidence threshold actually changed
-cache_key = (ss.frame_idx, round(conf_threshold, 2))
-if cache_key != (ss.last_frame_idx, ss.last_conf_threshold):
-    result = analyze_frame(
-        frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
-        simulator=ss.simulator, conf_threshold=conf_threshold,
-        use_real_detection=use_real_detection, advance_simulation=ss.running,
-        roi=roi, target_count=n_people,
-    )
-    ss.last_points = result["points"] if enable_detections else []
-    ss.last_detections = result["detections"] if enable_detections else []
-    ss.last_active_mode = result["mode"]
-    ss.last_frame_idx = ss.frame_idx
-    ss.last_conf_threshold = round(conf_threshold, 2)
+# ── Background AI detection ───────────────────────────────────────────────────
+# YOLO inference runs in a background thread so heatmap, bird's-eye, 3D and
+# charts all render immediately using the last known result while the new
+# inference completes. For synthetic/heuristic modes the call is fast enough
+# to run inline without a thread.
 
-points = ss.last_points
+def _run_detection(frame_copy, tracker, simulator, detector, conf_thr,
+                   use_real, advance, roi, target):
+    """Called from a daemon thread for real YOLO inference."""
+    try:
+        res = analyze_frame(
+            frame_bgr=frame_copy, detector=detector, tracker=tracker,
+            simulator=simulator, conf_threshold=conf_thr,
+            use_real_detection=use_real, advance_simulation=advance,
+            roi=roi, target_count=target,
+        )
+        ss.last_points     = res["points"] if enable_detections else []
+        ss.last_detections = res["detections"] if enable_detections else []
+        ss.last_active_mode = res["mode"]
+        ss.last_frame_idx  = ss.frame_idx
+        ss.last_conf_threshold = round(conf_thr, 2)
+        ss._detection_ready = True
+    except Exception:
+        ss._detection_ready = True
+
+cache_key = (ss.frame_idx, round(conf_threshold, 2))
+new_frame = cache_key != (ss.last_frame_idx, ss.last_conf_threshold)
+
+if new_frame:
+    if use_real_detection and ss.detector.mode == "real":
+        # Kick off YOLO in background; UI uses last_points immediately
+        ss.setdefault("_detection_ready", True)
+        ss._detection_ready = False
+        t = _threading.Thread(
+            target=_run_detection,
+            args=(frame.copy(), ss.tracker, ss.simulator, ss.detector,
+                  conf_threshold, use_real_detection, ss.running, roi, n_people),
+            daemon=True,
+        )
+        t.start()
+        # Also advance simulation inline so counts stay live
+        if ss.running:
+            sim_result = analyze_frame(
+                frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
+                simulator=ss.simulator, conf_threshold=conf_threshold,
+                use_real_detection=False, advance_simulation=True,
+                roi=roi, target_count=n_people,
+            )
+            # Only use sim result if we have no real detections yet
+            if not ss.last_points:
+                ss.last_points     = sim_result["points"] if enable_detections else []
+                ss.last_detections = sim_result["detections"] if enable_detections else []
+                ss.last_active_mode = sim_result["mode"]
+    else:
+        # Synthetic / heuristic — fast enough to run inline
+        result = analyze_frame(
+            frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
+            simulator=ss.simulator, conf_threshold=conf_threshold,
+            use_real_detection=use_real_detection, advance_simulation=ss.running,
+            roi=roi, target_count=n_people,
+        )
+        ss.last_points      = result["points"] if enable_detections else []
+        ss.last_detections  = result["detections"] if enable_detections else []
+        ss.last_active_mode = result["mode"]
+        ss.last_frame_idx   = ss.frame_idx
+        ss.last_conf_threshold = round(conf_threshold, 2)
+
+points     = ss.last_points
 detections = ss.last_detections
 active_mode = ss.get("last_active_mode", "synthetic")
 
@@ -537,12 +592,9 @@ with a5:
 st.write("")
 b1, b2 = st.columns(2)
 
-_chart_layout = dict(
-    paper_bgcolor=T["panel_bg"], plot_bgcolor=T["panel_bg"],
-    font=dict(color=T["muted"], size=10),
-    margin=dict(l=4, r=4, t=30, b=4),
-    height=200,
-)
+_cbg  = T["panel_bg"]
+_cfnt = dict(color=T["muted"], size=10)
+_cmrg = dict(l=4, r=4, t=30, b=4)
 
 with b1:
     fig_count = go.Figure()
@@ -551,7 +603,11 @@ with b1:
         line=dict(color=T["cyan"], width=2), fill="tozeroy",
         fillcolor="rgba(34,211,238,0.08)",
     ))
-    fig_count.update_layout(title="Crowd Count", **_chart_layout)
+    fig_count.update_layout(
+        title="Crowd Count", height=200,
+        paper_bgcolor=_cbg, plot_bgcolor=_cbg,
+        font=_cfnt, margin=_cmrg,
+    )
     st.plotly_chart(fig_count, use_container_width=True, config={"displayModeBar": False})
 
 with b2:
@@ -561,7 +617,11 @@ with b2:
         line=dict(color=T["orange"], width=2), fill="tozeroy",
         fillcolor="rgba(245,158,11,0.08)",
     ))
-    fig_density.update_layout(title="Density Index", **_chart_layout)
+    fig_density.update_layout(
+        title="Density Index", height=200,
+        paper_bgcolor=_cbg, plot_bgcolor=_cbg,
+        font=_cfnt, margin=_cmrg,
+    )
     st.plotly_chart(fig_density, use_container_width=True, config={"displayModeBar": False})
 
 b3, b4 = st.columns(2)
@@ -573,7 +633,11 @@ with b3:
         line=dict(color=T["green"], width=2),
         fill="tozeroy", fillcolor="rgba(34,197,94,0.08)",
     ))
-    fig_conf.update_layout(title="Detection Confidence", **{**_chart_layout, "height": 180})
+    fig_conf.update_layout(
+        title="Detection Confidence", height=180,
+        paper_bgcolor=_cbg, plot_bgcolor=_cbg,
+        font=_cfnt, margin=_cmrg,
+    )
     st.plotly_chart(fig_conf, use_container_width=True, config={"displayModeBar": False})
 
 with b4:
