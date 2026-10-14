@@ -508,8 +508,8 @@ with left:
 
 with right:
     st.markdown('<div class="panel-title">Bird\'s-Eye Density Map</div>', unsafe_allow_html=True)
-    bev_key = (tuple(points), show_roi, round(angle, 1), round(mag, 2))
-    if bev_key != ss.last_bev_points_key:
+    bev_key = (len(points), show_roi, round(angle, 1), round(mag, 2), ss.frame_idx // 3)
+    if bev_key != ss.last_bev_points_key or ss.last_bev_fig is None:
         ss.last_bev_fig = build_bird_eye_figure(
             points, W, H,
             roi=roi if show_roi else None,
@@ -527,8 +527,8 @@ with c3d2:
         horizontal=False, label_visibility="collapsed",
     )
 with c3d1:
-    fig3d_key = (tuple(points), view_mode)
-    if fig3d_key != ss.last_3d_points_key:
+    fig3d_key = (len(points), view_mode, ss.frame_idx // 3)
+    if fig3d_key != ss.last_3d_points_key or ss.last_3d_fig is None:
         ss.last_3d_fig = build_3d_density_figure(points, W, H, mode=view_mode)
         ss.last_3d_points_key = fig3d_key
     st.plotly_chart(ss.last_3d_fig, use_container_width=True, config={"displayModeBar": False})
