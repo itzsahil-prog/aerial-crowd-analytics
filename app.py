@@ -137,12 +137,14 @@ with st.sidebar:
     tgreen = T["green"]
     tborder = T["border"]
     tcyan = T["cyan"]
+    tmuted = T["muted"]
     det_mode = ss.detector.mode
-    if det_mode == "real":
+    
+    if det_mode == "heuristic":
         st.markdown(
             f'<div style="background:rgba(34,197,94,0.12);border:1px solid {tgreen};'
             f'border-radius:4px;padding:6px 10px;font-size:11px;color:{tgreen};">'
-            f'🟢 &nbsp;<b>YOLOv8 AI — Ready</b> (upload video to use)</div>',
+            f'🟢 &nbsp;<b>Heuristic Detection — Ready</b> (upload video to use)</div>',
             unsafe_allow_html=True,
         )
     else:
@@ -227,7 +229,7 @@ with st.sidebar:
     show_conf = st.checkbox("Confidence scores", value=True)
     show_heatmap = st.checkbox("Density heatmap", value=True)
     show_trails = st.checkbox("Movement trails", value=False)
-    conf_threshold = st.slider("Confidence threshold", 0.1, 0.95, config.YOLO_CONF_DEFAULT, 0.05)
+    conf_threshold = st.slider("Confidence threshold", 0.1, 0.95, 0.35, 0.05)
 
     st.markdown("---")
     st.markdown('<div class="sidebar-section">Alert Thresholds</div>', unsafe_allow_html=True)
@@ -315,7 +317,6 @@ if ss.running:
 # ── HUD bar ────────────────────────────────────────────────────────────────────
 
 _mode_labels = {
-    "real":      "YOLOv8 AI",
     "heuristic": "Heuristic",
     "synthetic": "Simulation",
 }

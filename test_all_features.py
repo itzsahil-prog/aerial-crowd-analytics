@@ -61,7 +61,7 @@ def test_config():
     
     required_attrs = [
         'DEFAULT_FRAME_WIDTH', 'DEFAULT_FRAME_HEIGHT', 'THEME',
-        'SIM_DEFAULTS', 'YOLO_CONF_DEFAULT', 'DENSITY_THRESHOLDS'
+        'SIM_DEFAULTS', 'DENSITY_THRESHOLDS'
     ]
     
     passed = 0
@@ -129,11 +129,9 @@ def test_detection():
         tracker = CentroidTracker(max_disappeared=10, max_distance=50)
         print(f"{GREEN}✓{RESET} CentroidTracker initialized")
         
-        # Test with dummy data (synthetic mode)
-        dummy_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-        if detector.mode == "real":
-            # Real detector exists, but we'll skip actual detection for speed
-            print(f"{GREEN}✓{RESET} Detector ready (real mode)")
+        # Test synthetic detection
+        if detector.mode == "heuristic":
+            print(f"{GREEN}✓{RESET} Detector ready (heuristic mode)")
         else:
             print(f"{GREEN}✓{RESET} Detector in synthetic mode")
         

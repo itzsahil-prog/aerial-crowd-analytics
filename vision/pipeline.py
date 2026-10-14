@@ -7,35 +7,6 @@ def analyze_frame(frame_bgr, detector, tracker, simulator, conf_threshold,
                   use_real_detection, advance_simulation=True, roi=None,
                   target_count=None):
 
-    # ── real YOLO detection ──────────────────────────────────────────────────
-    if use_real_detection and detector.mode == "real" and frame_bgr is not None:
-        try:
-            raw_detections = detector.detect_frame(frame_bgr)
-        except Exception:
-            raw_detections = None
-
-        if raw_detections is not None:
-            raw_detections = [d for d in raw_detections if d["conf"] >= conf_threshold]
-            centroids = [(d["cx"], d["cy"]) for d in raw_detections]
-
-            if advance_simulation:
-                tracked = tracker.update(centroids)
-            else:
-                tracked = dict(tracker.objects)
-
-            # assign track IDs by position index — avoids float key mismatch
-            obj_ids = list(tracked.keys())
-            obj_pts = [tracked[i] for i in obj_ids]
-            for d in raw_detections:
-                matched_id = None
-                for idx, pt in enumerate(obj_pts):
-                    if abs(pt[0] - d["cx"]) < 1.0 and abs(pt[1] - d["cy"]) < 1.0:
-                        matched_id = obj_ids[idx]
-                        break
-                d["track_id"] = matched_id
-
-            return {"points": centroids, "detections": raw_detections, "mode": "real"}
-
     # ── heuristic (content-aware) detection on real footage ──────────────────
     if use_real_detection and frame_bgr is not None:
         count = target_count or max(20, len(simulator.people))

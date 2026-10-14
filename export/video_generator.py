@@ -7,7 +7,7 @@ import time
 import cv2
 import numpy as np
 
-from config import OUTPUT_DIR, YOLO_CONF_DEFAULT
+from config import OUTPUT_DIR
 from simulation.crowd_simulator import CrowdSimulator
 from vision.detector import Detector
 from vision.tracker import CentroidTracker
@@ -57,7 +57,7 @@ def generate_demo_video(
     sim_config=None, roi_fraction=0.6, show_boxes=True, show_ids=True,
     show_heatmap=True, show_trails=True, intro_outro=True,
     progress_callback=None, source_frames=None, detector=None,
-    conf_threshold=YOLO_CONF_DEFAULT,
+    conf_threshold=0.35,
 ):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     w, h = resolution

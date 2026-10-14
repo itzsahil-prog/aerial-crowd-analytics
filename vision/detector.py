@@ -1,60 +1,17 @@
 # dev/creator: sahil
 
-import streamlit as st
 from numpy import ndarray
-
-from config import YOLO_MODEL_NAME, YOLO_CONF_DEFAULT, YOLO_PERSON_CLASS_ID
-
-
-@st.cache_resource(show_spinner=False)
-def load_yolo_model():
-    try:
-        from ultralytics import YOLO  # type: ignore[import-untyped]
-        model = YOLO(YOLO_MODEL_NAME)
-        return model, True
-    except Exception:
-        return None, False
 
 
 class Detector:
+    """Detector for crowd analysis - uses heuristic or synthetic modes only"""
 
-    def __init__(self, confidence: float = YOLO_CONF_DEFAULT) -> None:
-        self.confidence = confidence
-        self.model, self.is_real = load_yolo_model()
-
-    @property
-    def mode(self) -> str:
-        return "real" if self.is_real and self.model is not None else "synthetic"
-
-    def detect_frame(self, frame_bgr: ndarray) -> list:
-        if not self.is_real or self.model is None:
-            raise RuntimeError("Real detection model not available")
-
-        results = self.model.predict(
-            frame_bgr,
-            conf=self.confidence,
-            classes=[YOLO_PERSON_CLASS_ID],
-            verbose=False,
-        )
-        detections = []
-        for r in results:
-            boxes = getattr(r, "boxes", None)
-            if boxes is None:
-                continue
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                conf = float(box.conf[0])
-                cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                detections.append({
-                    "box": (x1, y1, x2, y2),
-                    "conf": conf,
-                    "cx": cx,
-                    "cy": cy,
-                })
-        return detections
+    def __init__(self) -> None:
+        self.mode = "heuristic"  # Always use heuristic for real footage
 
     @staticmethod
     def synthetic_boxes_from_points(people, box_size: int = 18) -> list:
+        """Generate synthetic detection boxes from simulation points"""
         detections = []
         for p in people:
             x, y = p["x"], p["y"]
