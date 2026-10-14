@@ -76,6 +76,18 @@ All features have been tested and verified to work correctly with no bugs or err
 
 ## Bug Fixes Applied
 
+### Latest Fix — Bird's-Eye Density Map Rendering
+**Issue:** Bird's-eye view panel showed blank/empty even with detected people  
+**Root Cause:** Using `Scattergl` which can have rendering issues in some Streamlit environments; no fallback for edge cases  
+**Solution:** Switched to regular `Scatter` trace and added explicit empty data handling
+
+**Technical Details:**
+- Changed from `go.Scattergl` to `go.Scatter` for better compatibility
+- Added conditional rendering: populated data gets full scatter, empty data gets invisible anchor
+- Ensures panel always renders with proper bounds even when no points present
+
+**Commit:** `135a87d` — "fix: bird's-eye view empty rendering"
+
 ### Critical Fix — 3D Crowd Density Rendering
 **Issue:** 3D panel showed blank/white areas  
 **Root Cause:** Separate code paths for empty/filled data caused inconsistent rendering  
@@ -165,11 +177,13 @@ Pipeline................................ ✓ PASSED (all tests)
 - ✅ No uncommitted changes
 - ✅ Repository: https://github.com/itzsahil-prog/aerial-crowd-analytics
 
-### Git History (Last 5 Commits)
-1. `2d13389` — add: comprehensive feature test suite with all modules verified
-2. `6257646` — fix: consolidate 3D points mode rendering logic to prevent blank/white panels
-3. `759b2e7` — revert: restore clean snapshot architecture, keep good fixes
-4. *(earlier)* — Various bug fixes and feature implementations
+### Git History (Last 6 Commits)
+1. `135a87d` — fix: bird's-eye view empty rendering (Scattergl → Scatter)
+2. `9b4e326` — docs: add comprehensive verification report
+3. `2d13389` — add: comprehensive feature test suite with all modules verified
+4. `6257646` — fix: consolidate 3D points mode rendering logic to prevent blank/white panels
+5. `759b2e7` — revert: restore clean snapshot architecture, keep good fixes
+6. *(earlier)* — Various bug fixes and feature implementations
 
 ---
 
