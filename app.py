@@ -175,6 +175,15 @@ def init_state():
     ss.setdefault("video_source_name", "Synthetic Scene")
     ss.setdefault("last_generated_video", None)
     ss.setdefault("start_time", time.time())
+    ss.setdefault("last_points", [])
+    ss.setdefault("last_detections", [])
+    ss.setdefault("last_frame_idx", -1)
+    ss.setdefault("last_conf_threshold", -1.0)
+    ss.setdefault("last_active_mode", "synthetic")
+    ss.setdefault("last_bev_fig", None)
+    ss.setdefault("last_bev_points_key", None)
+    ss.setdefault("last_3d_fig", None)
+    ss.setdefault("last_3d_points_key", None)
 
 
 init_state()
@@ -198,18 +207,26 @@ with st.sidebar:
     tgreen = T["green"]
     tborder = T["border"]
     tmuted = T["muted"]
-    if det_mode == "real":
+    tcyan = T["cyan"]
+    if det_mode == "real" and ss.video_capture is not None:
         st.markdown(
             f'<div style="background:rgba(34,197,94,0.12);border:1px solid {tgreen};'
             f'border-radius:4px;padding:6px 10px;font-size:11px;color:{tgreen};">'
-            f'🟢 &nbsp;<b>YOLOv8 AI Detection — Active</b></div>',
+            f'🟢 &nbsp;<b>YOLOv8 AI — Running</b></div>',
+            unsafe_allow_html=True,
+        )
+    elif det_mode == "real" and ss.video_capture is None:
+        st.markdown(
+            f'<div style="background:rgba(34,211,238,0.10);border:1px solid {tcyan};'
+            f'border-radius:4px;padding:6px 10px;font-size:11px;color:{tcyan};">'
+            f'◈ &nbsp;YOLOv8 ready — Upload video to use</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             f'<div style="background:rgba(34,211,238,0.08);border:1px solid {tborder};'
             f'border-radius:4px;padding:6px 10px;font-size:11px;color:{tmuted};">'
-            f'◉ &nbsp;Simulation Mode — Upload video for AI detection</div>',
+            f'◉ &nbsp;Simulation Mode</div>',
             unsafe_allow_html=True,
         )
     st.markdown("<br>", unsafe_allow_html=True)
@@ -344,15 +361,24 @@ if ss.running:
 frame = read_source_frame()
 use_real_detection = enable_detections and ss.video_capture is not None
 
-result = analyze_frame(
-    frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
-    simulator=ss.simulator, conf_threshold=conf_threshold,
-    use_real_detection=use_real_detection, advance_simulation=ss.running,
-    roi=roi, target_count=n_people,
-)
-points = result["points"] if enable_detections else []
-detections = result["detections"] if enable_detections else []
-active_mode = result["mode"]
+# Only re-run detection when frame index or confidence threshold actually changed
+cache_key = (ss.frame_idx, round(conf_threshold, 2))
+if cache_key != (ss.last_frame_idx, ss.last_conf_threshold):
+    result = analyze_frame(
+        frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
+        simulator=ss.simulator, conf_threshold=conf_threshold,
+        use_real_detection=use_real_detection, advance_simulation=ss.running,
+        roi=roi, target_count=n_people,
+    )
+    ss.last_points = result["points"] if enable_detections else []
+    ss.last_detections = result["detections"] if enable_detections else []
+    ss.last_active_mode = result["mode"]
+    ss.last_frame_idx = ss.frame_idx
+    ss.last_conf_threshold = round(conf_threshold, 2)
+
+points = ss.last_points
+detections = ss.last_detections
+active_mode = ss.get("last_active_mode", "synthetic")
 
 if show_heatmap:
     frame = apply_heatmap_overlay(frame, points, enabled=True)
@@ -367,8 +393,8 @@ frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 in_roi_points = filter_in_roi(points, roi)
 density_val, density_label, density_color = compute_density(len(in_roi_points), roi, W, H)
 ids_in_roi = [d.get("track_id") for d in detections if d.get("track_id") is not None]
-avg_speed = average_speed(ss.tracker, ids_in_roi) if ss.tracker.trails else 0.0
-angle, mag = flow_direction(ss.tracker, ids_in_roi) if ss.tracker.trails else (0.0, 0.0)
+avg_speed = average_speed(ss.tracker, ids_in_roi)
+angle, mag = flow_direction(ss.tracker, ids_in_roi)
 hot_cells = high_density_cells(points, W, H)
 mean_conf = float(np.mean([d["conf"] for d in detections])) if detections else 0.0
 elapsed = time.time() - ss.start_time
@@ -427,12 +453,15 @@ with left:
 
 with right:
     st.markdown('<div class="panel-title">Bird\'s-Eye Density Map</div>', unsafe_allow_html=True)
-    bev_fig = build_bird_eye_figure(
-        points, W, H,
-        roi=roi if show_roi else None,
-        flow_angle=angle, flow_mag=mag,
-    )
-    st.plotly_chart(bev_fig, use_container_width=True, config={"displayModeBar": False})
+    bev_key = (tuple(points), show_roi, round(angle, 1), round(mag, 2))
+    if bev_key != ss.last_bev_points_key:
+        ss.last_bev_fig = build_bird_eye_figure(
+            points, W, H,
+            roi=roi if show_roi else None,
+            flow_angle=angle, flow_mag=mag,
+        )
+        ss.last_bev_points_key = bev_key
+    st.plotly_chart(ss.last_bev_fig, use_container_width=True, config={"displayModeBar": False})
 
 st.markdown('<div class="panel-title">3D Crowd Density</div>', unsafe_allow_html=True)
 c3d1, c3d2 = st.columns([3, 1])
@@ -443,8 +472,11 @@ with c3d2:
         horizontal=False, label_visibility="collapsed",
     )
 with c3d1:
-    fig3d = build_3d_density_figure(points, W, H, mode=view_mode)
-    st.plotly_chart(fig3d, use_container_width=True, config={"displayModeBar": False})
+    fig3d_key = (tuple(points), view_mode)
+    if fig3d_key != ss.last_3d_points_key:
+        ss.last_3d_fig = build_3d_density_figure(points, W, H, mode=view_mode)
+        ss.last_3d_points_key = fig3d_key
+    st.plotly_chart(ss.last_3d_fig, use_container_width=True, config={"displayModeBar": False})
 
 
 # ── analytics row ─────────────────────────────────────────────────────────────
