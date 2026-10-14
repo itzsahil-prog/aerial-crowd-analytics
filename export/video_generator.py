@@ -7,7 +7,7 @@ import time
 import cv2
 import numpy as np
 
-from config import OUTPUT_DIR, YOLO_CONF_DEFAULT
+import config
 from simulation.crowd_simulator import CrowdSimulator
 from vision.detector import Detector
 from vision.tracker import CentroidTracker
@@ -21,12 +21,12 @@ from vision.video_processor import (
 def _get_output_dir():
     """Return a writable output directory (falls back to system temp on read-only filesystems)."""
     try:
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        test_path = os.path.join(OUTPUT_DIR, ".write_test")
+        os.makedirs(config.OUTPUT_DIR, exist_ok=True)
+        test_path = os.path.join(config.OUTPUT_DIR, ".write_test")
         with open(test_path, "w") as f:
             f.write("ok")
         os.remove(test_path)
-        return OUTPUT_DIR
+        return config.OUTPUT_DIR
     except OSError:
         return tempfile.gettempdir()
 
@@ -57,8 +57,10 @@ def generate_demo_video(
     sim_config=None, roi_fraction=0.6, show_boxes=True, show_ids=True,
     show_heatmap=True, show_trails=True, intro_outro=True,
     progress_callback=None, source_frames=None, detector=None,
-    conf_threshold=YOLO_CONF_DEFAULT,
+    conf_threshold=None,
 ):
+    if conf_threshold is None:
+        conf_threshold = config.YOLO_CONF_DEFAULT
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     w, h = resolution
     total_frames = int(duration_seconds * fps)
