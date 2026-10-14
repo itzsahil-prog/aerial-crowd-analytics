@@ -9,6 +9,7 @@ def build_bird_eye_figure(people_points, frame_w, frame_h, roi=None,
                            flow_angle=None, flow_mag=0.0, density_grid=None):
     fig = go.Figure()
 
+    # Always extract coordinates (empty lists if no points)
     xs = [p[0] for p in people_points]
     ys = [frame_h - p[1] for p in people_points]
 
@@ -24,12 +25,21 @@ def build_bird_eye_figure(people_points, frame_w, frame_h, roi=None,
             hoverinfo="skip",
         ))
 
-    fig.add_trace(go.Scattergl(
-        x=xs, y=ys, mode="markers",
-        marker=dict(size=5, color=THEME["green"], opacity=0.85,
-                    line=dict(width=0.5, color=THEME["cyan"])),
-        name="people", hoverinfo="skip",
-    ))
+    # Always add scatter trace, even if empty (prevents blank panel)
+    if len(people_points) > 0:
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys, mode="markers",
+            marker=dict(size=5, color=THEME["green"], opacity=0.85,
+                        line=dict(width=0.5, color=THEME["cyan"])),
+            name="people", hoverinfo="skip",
+        ))
+    else:
+        # Add invisible anchor point to maintain proper rendering
+        fig.add_trace(go.Scatter(
+            x=[frame_w / 2], y=[frame_h / 2], mode="markers",
+            marker=dict(size=0.1, opacity=0),
+            hoverinfo="skip",
+        ))
 
     if roi is not None:
         x1, y1, x2, y2 = roi
