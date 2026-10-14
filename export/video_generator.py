@@ -44,9 +44,9 @@ def _title_card(w, h, text_lines, duration_frames=15):
         frames.append(canvas.copy())
     return frames
 
-def _open_writer(path, fps, w, h):
+def _open_writer(path: str, fps: int, w: int, h: int):
     for fourcc_str in ("mp4v", "avc1", "XVID"):
-        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)  # type: ignore[attr-defined]
         writer = cv2.VideoWriter(path, fourcc, fps, (w, h))
         if writer.isOpened():
             return writer
@@ -84,7 +84,7 @@ def generate_demo_video(
 
     if intro_outro:
         for frame in _title_card(w, h, ["DRONE CROWD INTELLIGENCE"]):
-            writer.write(frame)
+            writer.write(frame)  # type: ignore[union-attr]
 
     using_source = source_frames is not None
     modes_seen = set()
@@ -130,20 +130,20 @@ def generate_demo_video(
         ]
         frame = draw_hud(frame, hud)
 
-        writer.write(frame)
+        writer.write(frame)  # type: ignore[union-attr]
         if progress_callback:
             progress_callback((i + 1) / total_frames)
 
     if intro_outro:
         outro_lines = ["END OF DEMO CLIP"]
         if "synthetic" in modes_seen:
-            outro_lines.append("SYNTHETIC DATA - NOT REAL SURVEILLANCE")
+            outro_lines.append("SYNTHETIC DATA")
         elif "heuristic" in modes_seen:
-            outro_lines.append("HEURISTIC CROWD ESTIMATE - NOT VERIFIED AI DETECTION")
+            outro_lines.append("HEURISTIC CROWD ESTIMATE")
         for frame in _title_card(w, h, outro_lines):
-            writer.write(frame)
+            writer.write(frame)  # type: ignore[union-attr]
 
-    writer.release()
+    writer.release()  # type: ignore[union-attr]
     if modes_seen == {"real"}:
         overall_mode = "real"
     elif len(modes_seen) > 1:
