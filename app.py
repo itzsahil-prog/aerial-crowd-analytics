@@ -356,80 +356,63 @@ def read_source_frame():
     return make_blank_aerial_canvas(W, H)
 
 
-import threading as _threading
-
 if ss.running:
     ss.frame_idx += 1
 
 frame = read_source_frame()
 use_real_detection = enable_detections and ss.video_capture is not None
 
-# ── Background AI detection ───────────────────────────────────────────────────
-# YOLO inference runs in a background thread so heatmap, bird's-eye, 3D and
-# charts all render immediately using the last known result while the new
-# inference completes. For synthetic/heuristic modes the call is fast enough
-# to run inline without a thread.
-
-def _run_detection(frame_copy, tracker, simulator, detector, conf_thr,
-                   use_real, advance, roi, target):
-    """Called from a daemon thread for real YOLO inference."""
-    try:
-        res = analyze_frame(
-            frame_bgr=frame_copy, detector=detector, tracker=tracker,
-            simulator=simulator, conf_threshold=conf_thr,
-            use_real_detection=use_real, advance_simulation=advance,
-            roi=roi, target_count=target,
-        )
-        ss.last_points     = res["points"] if enable_detections else []
-        ss.last_detections = res["detections"] if enable_detections else []
-        ss.last_active_mode = res["mode"]
-        ss.last_frame_idx  = ss.frame_idx
-        ss.last_conf_threshold = round(conf_thr, 2)
-        ss._detection_ready = True
-    except Exception:
-        ss._detection_ready = True
+# ── Detection pipeline ────────────────────────────────────────────────────────
+# Run inline on every frame. For YOLO we downscale the inference frame to
+# 640px wide so inference is fast (~80ms) while the display frame stays full
+# resolution. All other features render from the same result immediately.
 
 cache_key = (ss.frame_idx, round(conf_threshold, 2))
 new_frame = cache_key != (ss.last_frame_idx, ss.last_conf_threshold)
 
 if new_frame:
+    # For YOLO: run inference on a smaller copy, detections are scaled back up
     if use_real_detection and ss.detector.mode == "real":
-        # Kick off YOLO in background; UI uses last_points immediately
-        ss.setdefault("_detection_ready", True)
-        ss._detection_ready = False
-        t = _threading.Thread(
-            target=_run_detection,
-            args=(frame.copy(), ss.tracker, ss.simulator, ss.detector,
-                  conf_threshold, use_real_detection, ss.running, roi, n_people),
-            daemon=True,
+        infer_w = 640
+        scale = infer_w / W
+        infer_h = max(1, int(H * scale))
+        small_frame = cv2.resize(frame, (infer_w, infer_h))
+        result = analyze_frame(
+            frame_bgr=small_frame, detector=ss.detector, tracker=ss.tracker,
+            simulator=ss.simulator, conf_threshold=conf_threshold,
+            use_real_detection=True, advance_simulation=ss.running,
+            roi=(
+                roi[0] * scale, roi[1] * scale,
+                roi[2] * scale, roi[3] * scale,
+            ),
+            target_count=n_people,
         )
-        t.start()
-        # Also advance simulation inline so counts stay live
-        if ss.running:
-            sim_result = analyze_frame(
-                frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
-                simulator=ss.simulator, conf_threshold=conf_threshold,
-                use_real_detection=False, advance_simulation=True,
-                roi=roi, target_count=n_people,
-            )
-            # Only use sim result if we have no real detections yet
-            if not ss.last_points:
-                ss.last_points     = sim_result["points"] if enable_detections else []
-                ss.last_detections = sim_result["detections"] if enable_detections else []
-                ss.last_active_mode = sim_result["mode"]
+        # Scale detection coords back to display resolution
+        inv = 1.0 / scale
+        scaled_points = [(x * inv, y * inv) for x, y in result["points"]]
+        scaled_dets = []
+        for d in result["detections"]:
+            x1, y1, x2, y2 = d["box"]
+            scaled_dets.append({**d,
+                "box": (x1*inv, y1*inv, x2*inv, y2*inv),
+                "cx": d["cx"]*inv, "cy": d["cy"]*inv,
+            })
+        ss.last_points     = scaled_points if enable_detections else []
+        ss.last_detections = scaled_dets   if enable_detections else []
+        ss.last_active_mode = result["mode"]
     else:
-        # Synthetic / heuristic — fast enough to run inline
         result = analyze_frame(
             frame_bgr=frame, detector=ss.detector, tracker=ss.tracker,
             simulator=ss.simulator, conf_threshold=conf_threshold,
             use_real_detection=use_real_detection, advance_simulation=ss.running,
             roi=roi, target_count=n_people,
         )
-        ss.last_points      = result["points"] if enable_detections else []
+        ss.last_points      = result["points"]     if enable_detections else []
         ss.last_detections  = result["detections"] if enable_detections else []
         ss.last_active_mode = result["mode"]
-        ss.last_frame_idx   = ss.frame_idx
-        ss.last_conf_threshold = round(conf_threshold, 2)
+
+    ss.last_frame_idx      = ss.frame_idx
+    ss.last_conf_threshold = round(conf_threshold, 2)
 
 points     = ss.last_points
 detections = ss.last_detections

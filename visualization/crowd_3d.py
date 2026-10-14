@@ -73,11 +73,18 @@ def build_3d_density_figure(
                 ys_p.append(y)
                 zs_p.append(z)
                 colors.append(z)
+            max_c = max(colors) if colors else 1.0
+            min_c = min(colors) if colors else 0.0
+            # avoid cmin==cmax (all same density) which makes Plotly go white
+            if max_c == min_c:
+                max_c = min_c + 1.0
             fig.add_trace(go.Scatter3d(
                 x=xs_p, y=ys_p, z=zs_p, mode="markers",
                 marker=dict(
                     size=3,
                     color=colors,
+                    cmin=min_c,
+                    cmax=max_c,
                     colorscale=[
                         [0.0, THEME["cyan"]],
                         [0.6, THEME["orange"]],
