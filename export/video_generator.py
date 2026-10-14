@@ -7,7 +7,7 @@ import time
 import cv2
 import numpy as np
 
-from config import OUTPUT_DIR
+from config import OUTPUT_DIR, YOLO_CONF_DEFAULT
 from simulation.crowd_simulator import CrowdSimulator
 from vision.detector import Detector
 from vision.tracker import CentroidTracker
@@ -44,9 +44,9 @@ def _title_card(w, h, text_lines, duration_frames=15):
         frames.append(canvas.copy())
     return frames
 
-def _open_writer(path: str, fps: int, w: int, h: int):
+def _open_writer(path, fps, w, h):
     for fourcc_str in ("mp4v", "avc1", "XVID"):
-        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)  # type: ignore[attr-defined]
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
         writer = cv2.VideoWriter(path, fourcc, fps, (w, h))
         if writer.isOpened():
             return writer
@@ -57,7 +57,7 @@ def generate_demo_video(
     sim_config=None, roi_fraction=0.6, show_boxes=True, show_ids=True,
     show_heatmap=True, show_trails=True, intro_outro=True,
     progress_callback=None, source_frames=None, detector=None,
-    conf_threshold=0.35,
+    conf_threshold=YOLO_CONF_DEFAULT,
 ):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     w, h = resolution
@@ -84,7 +84,7 @@ def generate_demo_video(
 
     if intro_outro:
         for frame in _title_card(w, h, ["DRONE CROWD INTELLIGENCE"]):
-            writer.write(frame)  # type: ignore[union-attr]
+            writer.write(frame)
 
     using_source = source_frames is not None
     modes_seen = set()
@@ -130,20 +130,20 @@ def generate_demo_video(
         ]
         frame = draw_hud(frame, hud)
 
-        writer.write(frame)  # type: ignore[union-attr]
+        writer.write(frame)
         if progress_callback:
             progress_callback((i + 1) / total_frames)
 
     if intro_outro:
-        outro_lines = ["END OF DEMO CLIP"]
+        outro_lines = ["ANALYSIS COMPLETE"]
         if "synthetic" in modes_seen:
-            outro_lines.append("SYNTHETIC DATA")
+            outro_lines.append("SIMULATION MODE")
         elif "heuristic" in modes_seen:
-            outro_lines.append("HEURISTIC CROWD ESTIMATE")
+            outro_lines.append("CONTENT-AWARE ESTIMATION MODE")
         for frame in _title_card(w, h, outro_lines):
-            writer.write(frame)  # type: ignore[union-attr]
+            writer.write(frame)
 
-    writer.release()  # type: ignore[union-attr]
+    writer.release()
     if modes_seen == {"real"}:
         overall_mode = "real"
     elif len(modes_seen) > 1:
