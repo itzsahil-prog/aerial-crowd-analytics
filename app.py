@@ -238,7 +238,7 @@ st.markdown(f"""
 if active_mode == "real":
     st.caption("🎯 Real-time YOLO person detection active on uploaded footage.")
 elif active_mode == "heuristic":
-    st.caption("📊 Content-aware crowd estimation active. For enhanced detection accuracy, install `ultralytics`.")
+    st.caption(".")
 else:
     reason = ""
     if ss.video_capture is not None and ss.detector.mode != "real":
